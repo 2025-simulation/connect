@@ -1,0 +1,53 @@
+#+title: README
+
+* graphrag
+这个项目希望结合 open-webui 的前端进行输入输出，
+
+但是我希望使用的 AI 大模型是 本地部署的 graphrag 项目
+提问的格式是这样的
+
+项目的地址是 ~~/Developments/simulation/graphrag/.venv/bin/python -m~
+
+提问的格式类似于
+
+#+begin_src shell
+  ~/Developments/simulation/graphrag/.venv/bin/python -m graphrag query --root ./ragtest --method local --query "Tell me about Scrooge's relationship with Jacob Marley"
+#+end_src
+
+#+begin_src shell 
+  # Local search (focused on specific entities)
+  graphrag query --root ./ragtest --method local --query "Tell me about Scrooge's relationship with Jacob Marley"
+
+  # Different global search
+  graphrag query --root ./ragtest --method global --query "What are the main conflicts in the story?"
+
+  # Basic search
+  graphrag query --root ./ragtest --method basic --query "Who are the main characters?"
+#+end_src
+
+
+* blender
+
+后续 graphrag 的数据库会是包含了 blender 里面一个插件里面画图方法介绍的 markdown 文件，我会要求 AI 输出 JSON 文件。我希望可以做一个 MCP 能够自动输入 blender 的相应的位置里面。
+
+但是这个项目我还不知道如何实现，但是我觉得应该比较简单吧。
+1. 建立一个 mcp 服务，然后把 生成的JSON文件输入到 一个文件夹里面
+2. 然后做一个blender 插件，实现 mcp 和 blender 通信，让 AI 知道要放在哪里。然后执行一些函数放入 blender 相应的位置里面。
+   
+bpy.ops.node.bvtk_node_tree_import(filepath="", confirm=True)
+
+** 实现方案（已提供最小可用版本）
+
+- JSON Schema 与校验：`schemas/blender_actions.py` 提供 Blender 动作计划的 Pydantic 模型与校验。
+- 文件桥接目录：`blender-bridge/inbox/`（待处理），`processed/`（成功），`failed/`（失败）。
+- Blender 插件：`blender-bridge/addon.py`，在 Blender 中安装后每秒扫描 `inbox/`，读取 JSON 并在场景中执行。
+- 写入管道（适配 open-webui）：`graphrag/blender_json_pipe.py`，从消息中提取 JSON，校验并写入 `inbox/`。
+
+使用步骤：
+1. 在 Blender 的 Preferences → Add-ons → Install 安装 `blender-bridge/addon.py`，启用插件。
+2. 在 open-webui 中接入 `graphrag/blender_json_pipe.py`，选择模型 `blender-json-writer`。
+3. 按 Schema 发送 JSON（可放在 ```json 代码块中），插件会自动导入并执行。
+
+* 项目流程
+
+在 open-webui 界面提出问题，然后调用本地的 graphrag 项目进行回答，返回的 JSON 文件再通过 mcp 自动导入 blender 里面
