@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "doc": "Sample plan generated as fallback",
+  "actions": [
+    {
+      "type": "create_object",
+      "object_type": "MESH",
+      "primitive": "CUBE",
+      "name": "DemoCube"
+    },
+    {
+      "type": "add_modifier",
+      "object": "DemoCube",
+      "modifier": "SUBSURF",
+      "levels": 2
+    },
+    {
+      "type": "set_shade_smooth",
+      "object": "DemoCube"
+    }
+  ]
+}

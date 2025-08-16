@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "actions": [
+    {
+      "type": "create_object",
+      "object_type": "MESH",
+      "primitive": "CUBE",
+      "name": "DemoCube"
+    }
+  ]
+}
