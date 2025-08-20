@@ -51,6 +51,18 @@ ALLOWED_MODIFIERS = {"SUBSURF", "DISPLACE"}
 ALLOWED_PRIMITIVES = {"CUBE", "PLANE", "UV_SPHERE"}
 
 
+def _get_view3d_override():
+    win = bpy.context.window
+    if not win:
+        return None
+    for area in win.screen.areas:
+        if area.type == 'VIEW_3D':
+            region = next((r for r in area.regions if r.type == 'WINDOW'), None)
+            if region:
+                return {"window": win, "area": area, "region": region}
+    return None
+
+
 def _import_bvtk_json(path: str) -> None:
     # Require a Node Editor area to be available
     win = bpy.context.window
@@ -77,12 +89,25 @@ def _execute_action(action: dict) -> None:
         name = action.get("name")
         if primitive not in ALLOWED_PRIMITIVES:
             return
+        override = _get_view3d_override()
         if primitive == "CUBE":
-            bpy.ops.mesh.primitive_cube_add()
+            if override:
+                with bpy.context.temp_override(**override):
+                    bpy.ops.mesh.primitive_cube_add()
+            else:
+                bpy.ops.mesh.primitive_cube_add()
         elif primitive == "PLANE":
-            bpy.ops.mesh.primitive_plane_add()
+            if override:
+                with bpy.context.temp_override(**override):
+                    bpy.ops.mesh.primitive_plane_add()
+            else:
+                bpy.ops.mesh.primitive_plane_add()
         elif primitive == "UV_SPHERE":
-            bpy.ops.mesh.primitive_uv_sphere_add()
+            if override:
+                with bpy.context.temp_override(**override):
+                    bpy.ops.mesh.primitive_uv_sphere_add()
+            else:
+                bpy.ops.mesh.primitive_uv_sphere_add()
         obj = bpy.context.active_object
         if not obj:
             return
@@ -122,7 +147,12 @@ def _execute_action(action: dict) -> None:
         obj_name = action.get("object")
         obj = bpy.data.objects.get(obj_name)
         if obj and obj.type == 'MESH':
-            bpy.ops.object.shade_smooth()
+            override = _get_view3d_override()
+            if override:
+                with bpy.context.temp_override(**override, object=obj):
+                    bpy.ops.object.shade_smooth()
+            else:
+                bpy.ops.object.shade_smooth()
 
 
 def _execute_plan_dict(plan: dict) -> None:
@@ -148,8 +178,14 @@ def scan_once() -> float:
                 else:
                     _import_bvtk_json(src)
                 shutil.move(src, os.path.join(PROCESSED, name))
-            except Exception:
+            except Exception as e:
                 traceback.print_exc()
+                # Write an error sidecar for quick diagnosis
+                try:
+                    with open(os.path.join(FAILED, name + ".error.txt"), "w", encoding="utf-8") as ef:
+                        ef.write(str(e))
+                except Exception:
+                    pass
                 shutil.move(src, os.path.join(FAILED, name))
     finally:
         return 1.0
