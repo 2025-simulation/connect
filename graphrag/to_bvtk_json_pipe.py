@@ -104,6 +104,16 @@ class Pipe:
         DEFAULT_METHOD: str = Field(default="basic")
         GRAPHRAG_CWD: str = Field(default=os.path.expanduser("~/Developments/simulation/graphrag"), description="Working directory for graphrag CLI")
         ENABLE_GRAPHRAG: bool = Field(default=True, description="If false, skip graphrag and send empty context to LLM")
+        GRAPHRAG_EMITS_JSON: bool = Field(default=True, description="Treat GraphRAG stdout as final Blender JSON and save directly (no LLM)")
+        PROMPT_PREFIX: str = Field(
+            default=(
+                "Return ONLY a single JSON object following this schema: "
+                "{version:int, doc?:str, actions:[create_object|add_modifier|set_shade_smooth|create_texture|import_file]}. "
+                "No prose, no markdown fences."
+            ),
+            description="Prefix added before user question to instruct GraphRAG to reply with Blender-actions JSON",
+        )
+        PROMPT_SUFFIX: str = Field(default="", description="Optional suffix appended to the question")
 
         # OpenAI-compatible LLM
         OPENAI_API_BASE_URL: str = Field(default="http://localhost:11434/v1", description="OpenAI-compatible base URL, e.g. Ollama/OpenWebUI/LM Studio")
@@ -125,6 +135,11 @@ class Pipe:
         ]
 
     def _run_graphrag(self, question: str, method: str) -> str:
+        # Attach prefix/suffix so GraphRAG LLM按我们需求输出JSON
+        full_query = f"{self.valves.PROMPT_PREFIX}\n\n{question}"
+        if self.valves.PROMPT_SUFFIX:
+            full_query = f"{full_query}\n\n{self.valves.PROMPT_SUFFIX}"
+
         cmd = [
             os.path.expanduser(self.valves.GRAPHRAG_PATH),
             "-m",
@@ -135,7 +150,7 @@ class Pipe:
             "--method",
             method,
             "--query",
-            question,
+            full_query,
         ]
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=self.valves.GRAPHRAG_CWD)
         stdout, stderr = process.communicate()
@@ -202,6 +217,17 @@ class Pipe:
                 print(f"[graphrag-to-bvtk-json] GraphRAG error (continuing without context): {e}")
         else:
             context = ""
+
+        # If GraphRAG 直接输出的是我们需要的 JSON，优先短路保存，完全不需要任何 API
+        if self.valves.ENABLE_GRAPHRAG and self.valves.GRAPHRAG_EMITS_JSON and context:
+            candidate = try_extract_json_from_text(context) or context
+            try:
+                plan = parse_actions_json(candidate)
+                path = save_validated_actions(plan, self.valves.INBOX_DIR, prefix=self.valves.FILE_PREFIX)
+                return {"answer": f"Saved Blender actions (from GraphRAG) to: {path}"}
+            except Exception as e:
+                # 若解析失败，再走 LLM 或示例兜底
+                print(f"[graphrag-to-bvtk-json] Failed to parse GraphRAG JSON, falling back to LLM: {e}")
 
         if not self.valves.OPENAI_API_BASE_URL:
             if self.valves.FALLBACK_SAMPLE_ON_ERROR:
