@@ -1,5 +1,40 @@
 #+title: README
 
+* 概览
+
+- graphrag 地址： ~~/Developments/simulation/graphrag/~
+  ~source ~/Developments/simulation/graphrag/.venv/bin/activate~
+- openwebui 地址：~~/Developments/simulation/open-webui~
+  ~conda activate open-webui~
+
+
+现在问题是如何一键配置好这些所有。
+
+** 一键配置
+
+#+begin_src shell
+  bash ./scripts/setup.sh /path/to/blender-4.2.10-linux-x64/blender
+#+end_src
+
+做了什么：
+- 创建 `bvtk-bridge/{inbox,processed,failed}`
+- 将 `blender-bridge/bvtk_autoload_addon.py` 安装到用户插件目录
+- 生成启动脚本 `~/bin/blender-bvtk`，启动时自动：
+  - 设置 `CONNECT_PROJECT_ROOT` 和 `BVTK_INBOX_DIR`
+  - 启用插件 `BVTKNodes` 与 `bvtk_autoload_addon`
+
+使用：
+- 启动 Blender：
+  #+begin_src shell
+    ~/bin/blender-bvtk
+  #+end_src
+- 在 Open-WebUI 上传并选择模型 `graphrag-to-bvtk-json`（文件 `graphrag/to_bvtk_json_pipe.py`）
+- 在阀门里可选设置：
+  - `GRAPHRAG_PATH`、`GRAPHRAG_CWD`、`RAG_ROOT`
+  - `OPENAI_API_BASE_URL`、`OPENAI_MODEL`
+  - `INBOX_DIR`（默认为脚本设定的目录）
+- 直接提问，JSON 会落盘到 `inbox/` 并被 Blender 自动导入
+
 * graphrag
 这个项目希望结合 open-webui 的前端进行输入输出，
 
