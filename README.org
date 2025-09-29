@@ -1,4 +1,5 @@
 #+title: README
+包含了 open-webui 的 functions，和 blender 连接的 Python 文件
 
 * 概览
 

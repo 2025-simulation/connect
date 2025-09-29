@@ -6,7 +6,6 @@ import time
 import threading
 import queue
 
-# Try to import JSON helpers for Blender actions; provide robust fallbacks
 def _import_schema_utils():
     try:
         from schemas.blender_actions import (
@@ -14,22 +13,23 @@ def _import_schema_utils():
             parse_actions_json,
             save_validated_actions,
         )
+        # TODO: why to return these functions,
+        # how they be applied. 
         return try_extract_json_from_text, parse_actions_json, save_validated_actions
     except Exception:
         try:
-            # Add project root for relative import when running from OpenWebUI
             from pathlib import Path
+            # TODO: why the str "connect project root"
             project_root = os.environ.get("CONNECT_PROJECT_ROOT") or str(Path(__file__).resolve().parents[1])
             if project_root not in os.sys.path:
-                os.sys.path.append(project_root)
-            from schemas.blender_actions import (  # type: ignore
+                os.sys.path.append(project_root) # TODO what is the function of append
+            from schemas.blender_actions import (
                 try_extract_json_from_text,
                 parse_actions_json,
                 save_validated_actions,
             )
             return try_extract_json_from_text, parse_actions_json, save_validated_actions
         except Exception:
-            # Last resort lightweight implementations
             import json as _json
 
             def _try_extract_json_from_text(text: str):
@@ -37,6 +37,9 @@ def _import_schema_utils():
                 for fence in fences:
                     if fence in text:
                         try:
+                            # TODO
+                            # 1. what is fence
+                            # 2. what is index
                             start = text.index(fence) + len(fence)
                             end = text.index("```", start)
                             candidate = text[start:end].strip()
@@ -49,79 +52,64 @@ def _import_schema_utils():
                     end = text.rindex("}") + 1
                     candidate = text[start:end]
                     _json.loads(candidate)
-                    return candidate
+                    return cadidate
                 except Exception:
                     return None
 
-            def _parse_actions_json(json_str: str):
+            def _parse_actioins_json(json_str: str):
                 data = _json.loads(json_str)
+                # TODO: why json must cantain an actions list. 
                 if not isinstance(data, dict) or not isinstance(data.get("actions"), list):
                     raise ValueError("JSON must contain an 'actions' list")
                 return data
 
-            def _save_validated_actions(plan, inbox_dir: str, prefix: str = "task"):
+            def _save_validated_actions(plan, inbox_dir: str, prefix: str="task"):
                 from time import strftime
                 os.makedirs(inbox_dir, exist_ok=True)
                 ts = strftime("%Y%m%d-%H%M%S")
                 path = os.path.join(inbox_dir, f"{prefix}-{ts}.json")
                 if hasattr(plan, "model_dump_json"):
-                    content = plan.model_dump_json(indent=2, by_alias=True)
+                    content = plan.model_dump_jsone(indent=2, by_alias=True)
                 else:
                     content = _json.dumps(plan, ensure_ascii=False, indent=2)
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(content)
                 return path
-
-            return _try_extract_json_from_text, _parse_actions_json, _save_validated_actions
-
+    return _try_extract_json_from_text, _parse_actioins_json, _save_validated_actions
 
 try_extract_json_from_text, parse_actions_json, save_validated_actions = _import_schema_utils()
 
-
 def _extract_valid_actions_json(text: str):
-    """从文本中尽可能稳健地提取一个符合 actions 架构的 JSON 字符串。
-
-    策略：
-    1) 遍历所有三反引号代码块（``` 或 ```json），逐一校验。
-    2) 若无代码块匹配，基于出现的 "\"actions\"" 键定位附近的 JSON 子串并尝试解析。
-    返回首个通过 parse_actions_json 的 JSON 字符串；否则返回 None。
-    """
     try:
-        # 1) 扫描代码块
-        i = 0
+        i=0
         while True:
             start = text.find("```", i)
             if start == -1:
                 break
-            # 跳过语言标记
-            lang_end = text.find("\n", start + 3)
+            lang_end = text.find("\n", start+3)
             if lang_end == -1:
                 break
-            lang = text[start + 3:lang_end].strip().lower()
+            lang = text[start+3: lang_end].strip().lower()
             end = text.find("```", lang_end)
             if end == -1:
                 break
-            block = text[lang_end + 1:end]
+            block = text[lang_end+1 : end]
             candidate = block.strip()
             try:
-                # 仅当 block 可能是 JSON 时尝试
-                if candidate.startswith("{") and candidate.endswith("}"):
+                if candidate.startswitch("{" or candidate.endswith("}")):
                     parse_actions_json(candidate)
                     return candidate
             except Exception:
                 pass
-            i = end + 3
+            i = end+3
     except Exception:
         pass
 
-    # 2) 基于 "actions" 键的启发式截取
     try:
         key_pos = text.find('"actions"')
         if key_pos != -1:
-            # 向左找到最近的 '{'，向右找到匹配的 '}'（有限深度扫描）
             left = text.rfind('{', 0, key_pos)
             if left != -1:
-                # 简单深度计数匹配
                 depth = 0
                 for j in range(left, len(text)):
                     ch = text[j]
@@ -130,7 +118,7 @@ def _extract_valid_actions_json(text: str):
                     elif ch == '}':
                         depth -= 1
                         if depth == 0:
-                            candidate = text[left:j + 1]
+                            candidate = text[left: j+1]
                             try:
                                 parse_actions_json(candidate)
                                 return candidate
@@ -138,7 +126,6 @@ def _extract_valid_actions_json(text: str):
                                 break
     except Exception:
         pass
-
     return None
 
 class Pipe:
@@ -176,7 +163,7 @@ class Pipe:
         STREAM_DELAY: float = Field(
             default=0.05,
             description="Delay between stream chunks in seconds"
-        )
+        )    
 
     def __init__(self):
         self.valves = self.Valves()
@@ -187,27 +174,23 @@ class Pipe:
             {"id": "graphrag-local-realtime", "name": "GraphRAG Local Search (Real-time)"},
             {"id": "graphrag-global-realtime", "name": "GraphRAG Global Search (Real-time)"},
         ]
-
+    
     def pipe(self, body: dict):
-        # 获取用户问题
         messages = body.get("messages", [])
         if not messages:
             return {"answer": "No message provided"}
-        
+
         question = messages[-1].get("content", "")
         if not question:
             return {"answer": "Empty question"}
-        
-        # 根据模型ID选择搜索方法
+
         model_id = body.get("model", "graphrag-basic-realtime")
-        method = "basic"  # 默认方法
-        
+        method = "basic"
         if "local" in model_id:
             method = "local"
         elif "global" in model_id:
             method = "global"
-        
-        # 构建命令
+
         cmd = [
             os.path.expanduser(self.valves.GRAPHRAG_PATH),
             "-m", "graphrag", "query",
@@ -215,21 +198,16 @@ class Pipe:
             "--method", method,
             "--query", question
         ]
-        
-        # 检查是否需要流式输出
-        is_streaming = body.get("stream", False)
-        
-        if is_streaming:
-            # 返回高级流式响应
-            return self._advanced_stream_response(cmd)
-        else:
-            # 返回普通响应
-            return self._get_response(cmd)
-    
+
+        return self._advanced_stream_response(cmd)
+        # is_streaming = body.get("stream", False)
+        # if is_streaming:
+        #     return self._advanced_stream_response(cmd)
+        # else:
+        #     return self._get_response(cmd)
+
     def _advanced_stream_response(self, cmd):
-        """高级流式输出，支持字符级别的实时显示"""
         try:
-            # 启动进程
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -239,165 +217,96 @@ class Pipe:
                 universal_newlines=True,
                 cwd=self.valves.GRAPHRAG_CWD
             )
-            
-            # 创建输出队列
             output_queue = queue.Queue()
-            
-            # 启动输出读取线程
+
             def read_output():
                 try:
                     while True:
                         output = process.stdout.readline()
-                        if output == '' and process.poll() is not None:
+                        if output == '' or process.poll() is not None:
                             break
                         if output:
                             output_queue.put(output)
-                    # 读取错误输出
+                            
                     stderr_output = process.stderr.read()
                     if stderr_output:
-                        output_queue.put(f"[Error] {stderr_output}")
-                    output_queue.put(None)  # 结束信号
-                except Exception as e:
-                    output_queue.put(f"[Error] {str(e)}")
+                        output_queue.put(f"[ERROR]{stderr_output}")
                     output_queue.put(None)
-            
-            # 启动读取线程
-            read_thread = threading.Thread(target=read_output)
-            read_thread.daemon = True
-            read_thread.start()
-            
-            # 流式输出
-            buffer = ""
-            json_saved = False
-            while True:
-                try:
-                    # 非阻塞获取输出
-                    try:
-                        output = output_queue.get(timeout=0.1)
-                    except queue.Empty:
-                        # 检查进程是否还在运行
-                        if process.poll() is not None:
-                            break
-                        continue
-                    
-                    if output is None:  # 结束信号
-                        break
-                    
-                    buffer += output
+                except Exception as e:
+                    output_queue.put(f"[ERROR] {str(e)}")
+                    output_queue.put(None)
 
-                    # 尝试从缓冲区检测并保存一次 JSON
-                    if self.valves.SAVE_JSON_FROM_OUTPUT and not json_saved:
+                read_thread = threading.Thread(target=read_output)
+                read_thread.daemon = True
+                read_thread.start()
+
+                buffer = ""
+                json_saved = False
+                while True:
+                    try:
                         try:
-                            candidate = _extract_valid_actions_json(buffer) or try_extract_json_from_text(buffer)
-                            if candidate:
-                                plan = parse_actions_json(candidate)
-                                path = save_validated_actions(plan, self.valves.INBOX_DIR, prefix=self.valves.FILE_PREFIX)
-                                json_saved = True
-                                buffer += f"\n[Saved JSON to: {path}]\n"
-                        except Exception:
-                            pass
-                    
-                    # 按字符流式输出
-                    while len(buffer) >= self.valves.STREAM_CHUNK_SIZE:
-                        chunk = buffer[:self.valves.STREAM_CHUNK_SIZE]
-                        buffer = buffer[self.valves.STREAM_CHUNK_SIZE:]
-                        
+                            output = output_queue.get(timeout=0.1)
+                        except queue.Empty:
+                            if process.poll() is not None:
+                                break
+                            continue
+                        if output is None:
+                            break
+                        buffer += output
+
+                        while len(buffer) >= self.valves.STREAM_CHUNK_SIZE:
+                            chunk = buffer[:self.valves.STREAM_CHUNK_SIZE]
+                            buffer = buffer[self.valves.STREAM_CHUNK_SIZE:]
+
+                            yield {
+                                "choice": [{
+                                    "delta": {
+                                        "content": chunk
+                                    },
+                                    "finish_reason": None
+                                }]
+                            }
+                            time.sleep(self.valves.STREAM_DELAY)
+                    except Exception as e:
                         yield {
                             "choices": [{
                                 "delta": {
-                                    "content": chunk
+                                    "content": f"Error: {str(e)}"
                                 },
-                                "finish_reason": None
+                                "finish_reason": None 
                             }]
                         }
-                        
-                        # 添加延迟以模拟打字效果
-                        time.sleep(self.valves.STREAM_DELAY)
-                    
-                except Exception as e:
+                        break
+                if buffer:
                     yield {
                         "choices": [{
                             "delta": {
-                                "content": f"Error: {str(e)}"
+                                "content": buffer
                             },
-                            "finish_reason": None
+                            "finish_reason": None 
                         }]
                     }
-                    break
-            
-            # 输出剩余缓冲区内容
-            if buffer:
                 yield {
                     "choices": [{
-                        "delta": {
-                            "content": buffer
-                        },
-                        "finish_reason": None
+                        "delta": {},
+                        "finish_reason": "stop"
                     }]
                 }
-            
-            # 发送完成信号
-            yield {
-                "choices": [{
-                    "delta": {},
-                    "finish_reason": "stop"
-                }]
-            }
-            
         except Exception as e:
             yield {
                 "choices": [{
                     "delta": {
-                        "content": f"Error: {str(e)}"
+                        "content": f"ERROR: {str(e)}"
                     },
                     "finish_reason": "stop"
                 }]
             }
-    
-    def _get_response(self, cmd):
-        """获取完整响应"""
-        try:
-            # 执行命令
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                cwd=self.valves.GRAPHRAG_CWD
-            )
-            
-            # 获取输出
-            stdout, stderr = process.communicate()
-            
-            if process.returncode == 0:
-                answer = stdout.strip()
-                if not answer:
-                    answer = "No response generated from GraphRAG"
-            else:
-                answer = f"Error executing GraphRAG: {stderr.strip()}"
-                
-        except Exception as e:
-            answer = f"Error: {str(e)}"
-
-        # 非流式路径：检测并保存 JSON，但仍原样返回回答文本
-        if self.valves.SAVE_JSON_FROM_OUTPUT and isinstance(answer, str) and answer:
-            try:
-                candidate = _extract_valid_actions_json(answer) or try_extract_json_from_text(answer)
-                if candidate:
-                    plan = parse_actions_json(candidate)
-                    path = save_validated_actions(plan, self.valves.INBOX_DIR, prefix=self.valves.FILE_PREFIX)
-                    answer = f"{answer}\n\n[Saved JSON to: {path}]"
-            except Exception:
-                pass
-
-        return {"answer": answer}
 
     def get_pipe_info(self):
-        """返回管道信息"""
         return {
             "name": "GraphRAG Advanced Streaming Integration",
             "description": "Advanced streaming integration with character-level real-time output",
             "version": "2.0.0",
             "methods": ["basic", "local", "global"],
-            "features": ["streaming", "real-time", "character-level", "local-deployment", "typing-effect"]
+            "features": ["streaming", "real-time", "character-level", "local-deployment", "typing-effect"]            
         }
