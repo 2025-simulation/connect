@@ -170,9 +170,9 @@ class Pipe:
 
     def pipes(self):
         return [
-            {"id": "graphrag-basic-realtime", "name": "GraphRAG Basic Search (Real-time)"},
-            {"id": "graphrag-local-realtime", "name": "GraphRAG Local Search (Real-time)"},
-            {"id": "graphrag-global-realtime", "name": "GraphRAG Global Search (Real-time)"},
+            {"id": "graphrag_basic_realtime", "name": "GraphRAG Basic Search (Real-time)"},
+            {"id": "graphrag_local_realtime", "name": "GraphRAG Local Search (Real-time)"},
+            {"id": "graphrag_global_realtime", "name": "GraphRAG Global Search (Real-time)"},
         ]
     
     def pipe(self, body: dict):
@@ -184,7 +184,7 @@ class Pipe:
         if not question:
             return {"answer": "Empty question"}
 
-        model_id = body.get("model", "graphrag-basic-realtime")
+        model_id = body.get("model", "graphrag_basic_realtime")
         method = "basic"
         if "local" in model_id:
             method = "local"
