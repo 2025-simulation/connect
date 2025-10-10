@@ -1,3 +1,10 @@
+"""
+title: Extract JSON Action
+authors: Kauzre Zheng
+version: 2.0.1
+license: MIT
+"""
+
 from pydantic import BaseModel, Field
 from time import strftime
 

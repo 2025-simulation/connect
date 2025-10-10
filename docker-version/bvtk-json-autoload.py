@@ -1,7 +1,7 @@
 bl_info = {
-    "name": "BVTKNodes JSON Autoload test",
+    "name": "BVTKNodes JSON Autoload",
     "author": "Kazure Zheng",
-    "version": (1, 0, 0),
+    "version": (2, 0, 0),
     "blender": (4, 0, 0),
     "location": "Node Editor",
     "description": "Auto-import BVTKNodes JSON files from an inbox directory",
@@ -15,11 +15,11 @@ import shutil
 import traceback
 from bpy.app.handlers import persistent
 
-# PROJECT_ROOT = os.path.expanduser("/app/connect")
-PROJECT_ROOT = "/app/connect"
-INBOX = os.path.join(PROJECT_ROOT, "inbox")
-PROCESSED = os.path.join(PROJECT_ROOT, "processed")
-FAILED = os.path.join(PROJECT_ROOT, "failed")
+# PROJECT_ROOT = "/app/connect"
+PROJECT_ROOT = os.path.expanduser("~/Developments/simulation/final/connect/bvtk-bridge/")
+INBOX = os.path.join(PROJECT_ROOT, "inbox/")
+PROCESSED = os.path.join(PROJECT_ROOT, "processed/")
+FAILED = os.path.join(PROJECT_ROOT, "failed/")
 
 def ensure_dirs():
     for d in (INBOX, PROCESSED, FAILED):

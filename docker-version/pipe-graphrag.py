@@ -1,132 +1,18 @@
+"""
+title: Pipe GraphRAG
+authors: Kauzre Zheng
+version: 2.0.0
+license: MIT
+"""
+
+
 import subprocess
 from pydantic import BaseModel, Field
 import os
-import json
 import time
 import threading
 import queue
 
-def _import_schema_utils():
-    try:
-        from schemas.blender_actions import (
-            try_extract_json_from_text,
-            parse_actions_json,
-            save_validated_actions,
-        )
-        # TODO: why to return these functions,
-        # how they be applied. 
-        return try_extract_json_from_text, parse_actions_json, save_validated_actions
-    except Exception:
-        try:
-            from pathlib import Path
-            # TODO: why the str "connect project root"
-            project_root = os.environ.get("CONNECT_PROJECT_ROOT") or str(Path(__file__).resolve().parents[1])
-            if project_root not in os.sys.path:
-                os.sys.path.append(project_root) # TODO what is the function of append
-            from schemas.blender_actions import (
-                try_extract_json_from_text,
-                parse_actions_json,
-                save_validated_actions,
-            )
-            return try_extract_json_from_text, parse_actions_json, save_validated_actions
-        except Exception:
-            import json as _json
-
-            def _try_extract_json_from_text(text: str):
-                fences = ["```json", "```JSON", "```"]
-                for fence in fences:
-                    if fence in text:
-                        try:
-                            # TODO
-                            # 1. what is fence
-                            # 2. what is index
-                            start = text.index(fence) + len(fence)
-                            end = text.index("```", start)
-                            candidate = text[start:end].strip()
-                            _json.loads(candidate)
-                            return candidate
-                        except Exception:
-                            pass
-                try:
-                    start = text.index("{")
-                    end = text.rindex("}") + 1
-                    candidate = text[start:end]
-                    _json.loads(candidate)
-                    return cadidate
-                except Exception:
-                    return None
-
-            def _parse_actioins_json(json_str: str):
-                data = _json.loads(json_str)
-                # TODO: why json must cantain an actions list. 
-                if not isinstance(data, dict) or not isinstance(data.get("actions"), list):
-                    raise ValueError("JSON must contain an 'actions' list")
-                return data
-
-            def _save_validated_actions(plan, inbox_dir: str, prefix: str="task"):
-                from time import strftime
-                os.makedirs(inbox_dir, exist_ok=True)
-                ts = strftime("%Y%m%d-%H%M%S")
-                path = os.path.join(inbox_dir, f"{prefix}-{ts}.json")
-                if hasattr(plan, "model_dump_json"):
-                    content = plan.model_dump_jsone(indent=2, by_alias=True)
-                else:
-                    content = _json.dumps(plan, ensure_ascii=False, indent=2)
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write(content)
-                return path
-    return _try_extract_json_from_text, _parse_actioins_json, _save_validated_actions
-
-try_extract_json_from_text, parse_actions_json, save_validated_actions = _import_schema_utils()
-
-def _extract_valid_actions_json(text: str):
-    try:
-        i=0
-        while True:
-            start = text.find("```", i)
-            if start == -1:
-                break
-            lang_end = text.find("\n", start+3)
-            if lang_end == -1:
-                break
-            lang = text[start+3: lang_end].strip().lower()
-            end = text.find("```", lang_end)
-            if end == -1:
-                break
-            block = text[lang_end+1 : end]
-            candidate = block.strip()
-            try:
-                if candidate.startswitch("{" or candidate.endswith("}")):
-                    parse_actions_json(candidate)
-                    return candidate
-            except Exception:
-                pass
-            i = end+3
-    except Exception:
-        pass
-
-    try:
-        key_pos = text.find('"actions"')
-        if key_pos != -1:
-            left = text.rfind('{', 0, key_pos)
-            if left != -1:
-                depth = 0
-                for j in range(left, len(text)):
-                    ch = text[j]
-                    if ch == '{':
-                        depth += 1
-                    elif ch == '}':
-                        depth -= 1
-                        if depth == 0:
-                            candidate = text[left: j+1]
-                            try:
-                                parse_actions_json(candidate)
-                                return candidate
-                            except Exception:
-                                break
-    except Exception:
-        pass
-    return None
 
 class Pipe:
     class Valves(BaseModel):
@@ -200,11 +86,7 @@ class Pipe:
         ]
 
         return self._advanced_stream_response(cmd)
-        # is_streaming = body.get("stream", False)
-        # if is_streaming:
-        #     return self._advanced_stream_response(cmd)
-        # else:
-        #     return self._get_response(cmd)
+
 
     def _advanced_stream_response(self, cmd):
         try:
@@ -241,7 +123,6 @@ class Pipe:
                 read_thread.start()
 
                 buffer = ""
-                json_saved = False
                 while True:
                     try:
                         try:
